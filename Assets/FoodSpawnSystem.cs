@@ -18,13 +18,13 @@ public partial class FoodSpawnSystem : SystemBase
         RefRO<FoodSpawnerComponent> spawner = SystemAPI.GetComponentRO<FoodSpawnerComponent>(spawnerEntity);
         EntityCommandBuffer ecb = new(Allocator.Temp);
         FoodSpawnerComponent spawnerValuesRO = spawner.ValueRO;
-        Debug.Log("SpawningFood");
         
         for (int i = 0; i < spawnerValuesRO.Amount; i++)
         {
             Entity e = ecb.Instantiate(spawnerValuesRO.FoodPrefab);
             float randomX = UnityEngine.Random.Range(-spawner.ValueRO.SpawnRadius, spawner.ValueRO.SpawnRadius);
             float randomY = UnityEngine.Random.Range(-spawner.ValueRO.SpawnRadius, spawner.ValueRO.SpawnRadius);
+            float randomZ = UnityEngine.Random.Range(-spawner.ValueRO.SpawnRadius, spawner.ValueRO.SpawnRadius);
 
             ecb.AddComponent(e, new BoidComponent
             {
@@ -35,7 +35,7 @@ public partial class FoodSpawnSystem : SystemBase
             });
             ecb.SetComponent(e, new LocalTransform
             {
-                Position = new float3(randomX, randomY, 0),
+                Position = new float3(randomX, randomY, randomZ),
                 Rotation = quaternion.identity,
                 Scale = 1f
             });
