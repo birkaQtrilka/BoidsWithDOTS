@@ -1,35 +1,41 @@
-using System.Collections;
-using System.Collections.Generic;
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
-using UnityEngine;
-
-public partial class FoodSpawnSystem : SystemBase
+[UpdateBefore(typeof(TransformSystemGroup))]
+public partial struct FoodSpawnSystem : ISystem
 {
-    protected override void OnUpdate()
-    {
-        if (!Input.GetKeyDown(KeyCode.F)) return;
 
+    [BurstCompile]
+    public void OnUpdate(ref SystemState state)
+    {
         if (!SystemAPI.TryGetSingletonEntity<FoodSpawnerComponent>(out Entity spawnerEntity))
             return;
+        if (!SystemAPI.TryGetSingletonEntity<FoodSingleton>(out Entity signletonEntity))
+            return;
+        RefRW<FoodSingleton> data = SystemAPI.GetComponentRW<FoodSingleton>(signletonEntity);
 
-        RefRO<FoodSpawnerComponent> spawner = SystemAPI.GetComponentRO<FoodSpawnerComponent>(spawnerEntity);
+        if (!data.ValueRO.Spawn) return;
+        data.ValueRW.Spawn = false;
+
+        RefRW<FoodSpawnerComponent> spawner = SystemAPI.GetComponentRW<FoodSpawnerComponent>(spawnerEntity);
         EntityCommandBuffer ecb = new(Allocator.Temp);
         FoodSpawnerComponent spawnerValuesRO = spawner.ValueRO;
         
-        for (int i = 0; i < spawnerValuesRO.Amount; i++)
+
+        for (int i = 0; i < data.ValueRO.Amount; i++)
         {
             Entity e = ecb.Instantiate(spawnerValuesRO.FoodPrefab);
-            float randomX = UnityEngine.Random.Range(-spawner.ValueRO.SpawnRadius, spawner.ValueRO.SpawnRadius);
-            float randomY = UnityEngine.Random.Range(-spawner.ValueRO.SpawnRadius, spawner.ValueRO.SpawnRadius);
-            float randomZ = UnityEngine.Random.Range(-spawner.ValueRO.SpawnRadius, spawner.ValueRO.SpawnRadius);
+            //maybe needs rw values
+            float randomX = (float)((spawner.ValueRW.Random.NextDouble() * 2) - 1) * spawner.ValueRW.SpawnRadius;
+            float randomY = (float)((spawner.ValueRW.Random.NextDouble() * 2) - 1) * spawner.ValueRW.SpawnRadius;
+            float randomZ = (float)((spawner.ValueRW.Random.NextDouble() * 2) - 1) * spawner.ValueRW.SpawnRadius;
 
             ecb.AddComponent(e, new BoidComponent
             {
                 IsFood = true,
-                CellSize = spawnerValuesRO.CellSize,
+                CellSize = spawnerValuesRO.CellSize,//cellSize is needed for the hash function to work
                 EatingDistance = spawnerValuesRO.EatingDistance,
                 Prefab = spawnerValuesRO.FoodPrefab
             });
@@ -39,7 +45,8 @@ public partial class FoodSpawnSystem : SystemBase
                 Rotation = quaternion.identity,
                 Scale = 1f
             });
+            ecb.AddComponent(e, new FoodTag());
         }
-        ecb.Playback(EntityManager);
+        ecb.Playback(state.EntityManager);
     }
 }

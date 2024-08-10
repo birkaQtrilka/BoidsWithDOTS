@@ -1,13 +1,12 @@
-using System.Collections;
-using System.Collections.Generic;
 using Unity.Entities;
-using UnityEngine;
+using Unity.Mathematics;
 
 public struct FoodSpawnerComponent : IComponentData
 {
+    public Random Random;
     public float SpawnRadius { get; set; }
-    public int Amount { get; set; }
     public Entity FoodPrefab { get; set; }
     public int CellSize { get; set; }
     public float EatingDistance { get; set; }
+
 }

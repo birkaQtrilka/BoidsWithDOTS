@@ -20,8 +20,8 @@ public partial struct BoidSpawnerSystem : ISystem
         if (spawner.ValueRO.ElapsedTime < spawner.ValueRO.Interval) return;
 
         BoidSpawnerComponent spawnerValuesRO = spawner.ValueRO;
+        //TODO: some math if adding boids per interval won't add up to BoidsToSpawn
         spawner.ValueRW.TotalSpawnedBoids += spawnerValuesRO.BoidsPerInterval;
-
         if (spawnerValuesRO.TotalSpawnedBoids >= spawnerValuesRO.BoidsToSpawn)
             return;
 
@@ -38,6 +38,7 @@ public partial struct BoidSpawnerSystem : ISystem
         state.Dependency = jobHandle;
         
     }
+
     [BurstCompile]
     public partial struct SpawnBoidsJob : IJobFor
     {

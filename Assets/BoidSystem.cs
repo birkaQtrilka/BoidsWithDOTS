@@ -1,11 +1,8 @@
-using System.Globalization;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
-using static UnityEngine.Rendering.DebugUI.Table;
-using static UnityEngine.RuleTile.TilingRuleOutput;
 
 
 public partial struct BoidSystem : ISystem
