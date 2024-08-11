@@ -7,8 +7,6 @@ public struct BoidSharedData : IComponentData
     public float PersceptionDistance { get; set; }
     public float Speed { get; set; }
     public float Step { get; set; }
-    public float MaxForce { get; set; }
-
     public int CellSize { get; set; }
     public float ArenaRadius { get; set; }
 

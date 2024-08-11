@@ -15,6 +15,7 @@ public class FoodSpawnerMono : MonoBehaviour
     void Awake()
     {
         _spawnAmount = 1; 
+
         _spawnAmountSlider.onValueChanged.AddListener(v =>
         {
             _spawnAmount = (int)v;
@@ -30,10 +31,6 @@ public class FoodSpawnerMono : MonoBehaviour
 
     public void SpawnFood()
     {
-        FoodSpawnerComponent initialState = _entityManager.GetComponentData<FoodSpawnerComponent>(_singleton);
-        initialState.Spawn = true;
-        initialState.Amount = _spawnAmount;
 
-        _entityManager.SetComponentData(_singleton, initialState);
     }
 }

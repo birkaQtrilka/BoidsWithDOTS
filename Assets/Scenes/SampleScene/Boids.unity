@@ -155,7 +155,7 @@ MonoBehaviour:
   <Prefab>k__BackingField: {fileID: 5094376716774794710, guid: e8c8b7d091d47b1419d32202a0180b51, type: 3}
   <Interval>k__BackingField: 1
   <BoidsPerInterval>k__BackingField: 5000
-  <BoidsToSpawn>k__BackingField: 20000
+  <BoidsToSpawn>k__BackingField: 10000
   <PersceptionDistance>k__BackingField: 10
   <Speed>k__BackingField: 1
   <CellSize>k__BackingField: 5
