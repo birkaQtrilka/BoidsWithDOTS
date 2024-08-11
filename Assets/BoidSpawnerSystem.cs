@@ -65,20 +65,7 @@ public partial struct BoidSpawnerSystem : ISystem
 
             ecb.AddComponent(e, new BoidComponent
             {
-                velocity = math.normalize(new float3(randomX, randomY, randomZ)) * spawnerValuesRO.MaxSpeed,
-                PersceptionDistance = spawnerValuesRO.PersceptionDistance,
-                Speed = spawnerValuesRO.MaxSpeed,
-                CellSize = spawnerValuesRO.CellSize,
-                AlignmentBias = spawnerValuesRO.AlignmentBias,
-                SeparationBias = spawnerValuesRO.SeparationBias,
-                CohesionBias = spawnerValuesRO.CohesionBias,
-                Step = spawnerValuesRO.Step,
-                MaxForce = spawnerValuesRO.MaxForce,
-                FoodAttraction = spawnerValuesRO.FoodAttraction,
-                ArenaRadius = spawnerValuesRO.ArenaRadius,
-                WallRepellent = spawnerValuesRO.WallRepellent,
-                EatingDistance = spawnerValuesRO.EatingDistance,
-                Prefab = spawnerValuesRO.BoidPrefab,
+                velocity = math.normalize(new float3(randomX, randomY, randomZ)) * spawnerValuesRO.Speed,
             });
 
         }

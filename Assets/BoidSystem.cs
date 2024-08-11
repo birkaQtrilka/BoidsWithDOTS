@@ -4,11 +4,12 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
 
-
+//[UpdateAfter((typeof(BoidSpawnerSystem)))]
 public partial struct BoidSystem : ISystem
 {
     NativeParallelMultiHashMap<int, BoidComponent> _cellVsEntityPositions;
     EntityQuery _boidQuery;
+    Entity _spawnerEntity;
 
     [BurstCompile]
     public void OnCreate(ref SystemState state)
@@ -19,6 +20,7 @@ public partial struct BoidSystem : ISystem
                     .WithAll<LocalToWorld>()
                     .Build();
         state.RequireForUpdate<BoidComponent>();
+        //state.RequireForUpdate<BoidSpawnerComponent>();
     }
 
     [BurstCompile]
@@ -30,6 +32,10 @@ public partial struct BoidSystem : ISystem
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
+        SystemAPI.TryGetSingletonEntity<BoidSpawnerComponent>(out _spawnerEntity);//probably don't cache it here but just in the update loop?
+
+        RefRO<BoidSpawnerComponent> spawner = SystemAPI.GetComponentRO<BoidSpawnerComponent>(_spawnerEntity);
+
         _cellVsEntityPositions.Clear();
         int entityCount = _boidQuery.CalculateEntityCount();
         if (entityCount > _cellVsEntityPositions.Capacity)
@@ -45,6 +51,7 @@ public partial struct BoidSystem : ISystem
         var populateCellJobHandle = new PopulateCellJob
         {
             cellVsEntityPositionsParallel = cellVsEntityPositionsParallel,
+            sharedData = spawner.ValueRO,
         }.ScheduleParallel(state.Dependency);
 
         var boidMovementJobHandle = new BoidMovementJob
@@ -52,46 +59,22 @@ public partial struct BoidSystem : ISystem
             cellVsEntityPositions = _cellVsEntityPositions,
             deltaTime = SystemAPI.Time.DeltaTime,
             ecb = entityCommandBuffer.AsParallelWriter(),
+            sharedData = spawner.ValueRO,
         }.ScheduleParallel(populateCellJobHandle);
         state.Dependency = boidMovementJobHandle;
     }
-
-   
-        //readonly void DebugDrawBoid(float3 position)
-        //{
-        //    float3 Up = new (0, 1, 0);
-        //    float3 Right = new (1, 0, 0);
-        //    float size = .2f;
-
-        //    Debug.DrawLine(position + (Up - Right) * size, position + (Up + Right) * size);
-        //    Debug.DrawLine(position + (-Up - Right) * size,position + (-Up + Right) * size);
-        //    Debug.DrawLine(position + (Up - Right) * size, position + (-Up - Right) * size);
-        //    Debug.DrawLine(position + (Up + Right) * size, position + (-Up + Right) * size);
-        //}
-
-    
-    //readonly void DebugDrawWalls()
-    //{
-    //    float3 Up = new(0, 1, 0);
-    //    float3 Right = new(1, 0, 0);
-    //    float wall = 10;
-
-    //    Debug.DrawLine((Up - Right) * wall, (Up + Right) * wall);
-    //    Debug.DrawLine((-Up - Right) * wall, (-Up + Right) * wall);
-    //    Debug.DrawLine((Up - Right) * wall, (-Up - Right) * wall);
-    //    Debug.DrawLine((Up + Right) * wall, (-Up + Right) * wall);
-    //}
 }
 
  [BurstCompile]
 public partial struct PopulateCellJob : IJobEntity
 {
     public NativeParallelMultiHashMap<int, BoidComponent>.ParallelWriter cellVsEntityPositionsParallel;
-
+    public BoidSpawnerComponent sharedData;
+         
     public void Execute(ref BoidComponent bc, in LocalTransform trans)
     {
         bc.currentPosition = trans.Position;
-        cellVsEntityPositionsParallel.Add(GetUniqueKeyForPosition(trans.Position, bc.CellSize), bc);
+        cellVsEntityPositionsParallel.Add(GetUniqueKeyForPosition(trans.Position, sharedData.CellSize), bc);
     }
     readonly int GetUniqueKeyForPosition(float3 position, int cellSize)
     {
@@ -104,25 +87,24 @@ public partial struct BoidMovementJob : IJobEntity
 {
     [ReadOnly] public NativeParallelMultiHashMap<int, BoidComponent> cellVsEntityPositions;
     [ReadOnly] public float deltaTime;
+    [ReadOnly] public BoidSpawnerComponent sharedData;
+
     public EntityCommandBuffer.ParallelWriter ecb;
 
     public void Execute(Entity e, [ChunkIndexInQuery] int sortKey, ref BoidComponent boid, ref LocalTransform trans)
     {
-        int key = GetUniqueKeyForPosition(trans.Position, boid.CellSize);
-        int total = 0;
+        int    key = GetUniqueKeyForPosition(trans.Position, sharedData.CellSize);
+        int    total = 0;
         float3 separation = float3.zero;
         float3 alignment = float3.zero;
         float3 cohesion = float3.zero;
         float3 foodMagnetism = float3.zero;
         float3 closestFood = float3.zero;
-        float closestFoodDistance = float.MaxValue;
-
-        //DebugDrawBoid(trans.Position);
+        float  closestFoodDistance = float.MaxValue;
+        bool   canLoop = true;
 
         if (!cellVsEntityPositions.TryGetFirstValue(key, out BoidComponent neighbour, out NativeParallelMultiHashMapIterator<int> nmhKeyIterator)) return;
 
-        // Debug.DrawLine(neighbour.currentPosition, trans.Position, Color.red);
-        bool canLoop = true;
         do
         {
             Eat(sortKey, in neighbour, ref boid, ref ecb, ref e, ref canLoop);
@@ -130,7 +112,8 @@ public partial struct BoidMovementJob : IJobEntity
 
             float distance = math.distance(trans.Position, neighbour.currentPosition);
             bool neighbourIsCurrBoid = trans.Position.Equals(neighbour.currentPosition);
-            if (neighbourIsCurrBoid || distance > boid.PersceptionDistance) continue;
+
+            if (neighbourIsCurrBoid || distance > sharedData.PersceptionDistance) continue;
             if (neighbour.IsFood && distance < closestFoodDistance)
             {
                 closestFoodDistance = distance;
@@ -152,28 +135,28 @@ public partial struct BoidMovementJob : IJobEntity
         {
             cohesion /= total;
             cohesion -= (trans.Position + boid.velocity);
-            cohesion = math.normalize(cohesion) * boid.CohesionBias;
+            cohesion = math.normalize(cohesion) * sharedData.CohesionBias;
 
             separation /= total;
             separation -= boid.velocity;
-            separation = math.normalize(separation) * boid.SeparationBias;
+            separation = math.normalize(separation) * sharedData.SeparationBias;
 
             alignment /= total;
             alignment -= boid.velocity;
-            alignment = math.normalize(alignment) * boid.AlignmentBias;
+            alignment = math.normalize(alignment) * sharedData.AlignmentBias;
 
         }
 
         if (!closestFood.Equals(float3.zero))
-            foodMagnetism = math.normalize(foodMagnetism) * boid.FoodAttraction;
+            foodMagnetism = math.normalize(foodMagnetism) * sharedData.FoodAttraction;
 
-        float3 wallRepelant = GetWallRepellentValue(trans.Position, boid.ArenaRadius, boid.WallRepellent);
+        float3 wallRepelant = GetWallRepellentValue(trans.Position, sharedData.ArenaRadius, sharedData.WallRepellent);
 
         boid.acceleration += (cohesion + alignment + separation + wallRepelant + foodMagnetism);
         boid.velocity += boid.acceleration;
-        boid.velocity = math.normalize(boid.velocity) * boid.Speed;
+        boid.velocity = math.normalize(boid.velocity) * sharedData.Speed;
         boid.acceleration = float3.zero;
-        trans.Position = math.lerp(trans.Position, (trans.Position + boid.velocity), deltaTime * boid.Step);
+        trans.Position = math.lerp(trans.Position, (trans.Position + boid.velocity), deltaTime * sharedData.Step);
         trans.Rotation = math.slerp(trans.Rotation, quaternion.LookRotation(math.normalize(boid.velocity), math.up()), deltaTime * 10);
     }
 
@@ -203,27 +186,19 @@ public partial struct BoidMovementJob : IJobEntity
     {
         return (int)((15 * math.floor(position.x / cellSize)) + (17 * math.floor(position.y / cellSize)) + (19 * math.floor(position.z / cellSize)));
     }
-
+    
     [BurstCompile]
     void Eat(int sortKey, in BoidComponent neighbour, ref BoidComponent boid, ref EntityCommandBuffer.ParallelWriter ecb, ref Entity e, ref bool canLoop)
     {
-        if (!canLoop) return;
-
-        bool foodAndBoidInteraction = neighbour.IsFood ^ boid.IsFood;
-        if (!foodAndBoidInteraction) return;
+        if (!canLoop || !boid.IsFood || neighbour.IsFood) return;
 
         float distance = math.distance(boid.currentPosition, neighbour.currentPosition);
 
-        if (distance > boid.EatingDistance) return;
+        if (distance > sharedData.EatingDistance) return;
 
-        if (boid.IsFood)
-        {
-            ecb.DestroyEntity(sortKey, e);
-            canLoop = false;
-            return;
-        }
+        ecb.DestroyEntity(sortKey, e);
 
-        var newEntity = ecb.Instantiate(sortKey, boid.Prefab);
+        var newEntity = ecb.Instantiate(sortKey, sharedData.BoidPrefab);
         ecb.SetComponent(sortKey, newEntity, new LocalTransform
         {
             Position = boid.currentPosition,
@@ -233,21 +208,8 @@ public partial struct BoidMovementJob : IJobEntity
         ecb.AddComponent(sortKey, newEntity, new BoidComponent
         {
             velocity = -boid.velocity,
-            PersceptionDistance = boid.PersceptionDistance,
-            Speed = boid.Speed,
-            CellSize = boid.CellSize,
-            AlignmentBias = boid.AlignmentBias,
-            SeparationBias = boid.SeparationBias,
-            CohesionBias = boid.CohesionBias,
-            Step = boid.Step,
-            MaxForce = boid.MaxForce,
-            FoodAttraction = boid.FoodAttraction,
-            ArenaRadius = boid.ArenaRadius,
-            WallRepellent = boid.WallRepellent,
-            EatingDistance = boid.EatingDistance,
-            Prefab = boid.Prefab,
         });
-
         canLoop = false;
+
     }
 }

@@ -6,7 +6,6 @@ using UnityEngine;
 public class FoodSpawnerAuthoring : MonoBehaviour
 {
     [field: SerializeField] public BoidSpawnerAuthoring BoidSpawner { get; set; }
-
     [field: SerializeField] public GameObject FoodPrefab { get; set; }
 
     public class FoodSpawnerBaker : Baker<FoodSpawnerAuthoring>

@@ -9,4 +9,6 @@ public struct FoodSpawnerComponent : IComponentData
     public int CellSize { get; set; }
     public float EatingDistance { get; set; }
 
+    public bool Spawn;
+    public int Amount;
 }

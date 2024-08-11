@@ -12,19 +12,14 @@ public partial struct FoodSpawnSystem : ISystem
     {
         if (!SystemAPI.TryGetSingletonEntity<FoodSpawnerComponent>(out Entity spawnerEntity))
             return;
-        if (!SystemAPI.TryGetSingletonEntity<FoodSingleton>(out Entity signletonEntity))
-            return;
-        RefRW<FoodSingleton> data = SystemAPI.GetComponentRW<FoodSingleton>(signletonEntity);
-
-        if (!data.ValueRO.Spawn) return;
-        data.ValueRW.Spawn = false;
-
         RefRW<FoodSpawnerComponent> spawner = SystemAPI.GetComponentRW<FoodSpawnerComponent>(spawnerEntity);
-        EntityCommandBuffer ecb = new(Allocator.Temp);
         FoodSpawnerComponent spawnerValuesRO = spawner.ValueRO;
-        
 
-        for (int i = 0; i < data.ValueRO.Amount; i++)
+        if (!spawnerValuesRO.Spawn) return;
+        spawner.ValueRW.Spawn = false;
+        EntityCommandBuffer ecb = new(Allocator.Temp);
+        
+        for (int i = 0; i < spawner.ValueRO.Amount; i++)
         {
             Entity e = ecb.Instantiate(spawnerValuesRO.FoodPrefab);
             //maybe needs rw values
@@ -35,9 +30,6 @@ public partial struct FoodSpawnSystem : ISystem
             ecb.AddComponent(e, new BoidComponent
             {
                 IsFood = true,
-                CellSize = spawnerValuesRO.CellSize,//cellSize is needed for the hash function to work
-                EatingDistance = spawnerValuesRO.EatingDistance,
-                Prefab = spawnerValuesRO.FoodPrefab
             });
             ecb.SetComponent(e, new LocalTransform
             {
